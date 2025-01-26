@@ -39,46 +39,43 @@ the_leaderboard = Leaderboard()
 the_leaderboard.load_from_file("leaderboard.json")
 
 
+
 class Handler(BaseHTTPRequestHandler):
-    def do_POST (self):
+    def do_POST(self):
         self.send_response(200)
         self.send_header('Content-type', 'text/html')
         self.end_headers()
 
         name, score = self.path.split('/')[1:]
 
-        self.wfile.write(bytes("POST request for {}".format(self.path)  , 'utf-8'))
+        self.wfile.write(bytes("POST request for {}".format(self.path), 'utf-8'))
         the_leaderboard.set_score(name, int(score))
         the_leaderboard.save_to_file("leaderboard.json")
-
     def do_GET(self):
         self.send_response(200)
         self.send_header('Content-type', 'text/html')
         self.end_headers()
-
 
         sorted_scores = the_leaderboard.get_sorted_Scores(10, 'descending')
         if not sorted_scores:  # Exit if there are no scores
             self.wfile.write(bytes("<p>No scores to display.</p>", 'utf-8'))
             return
 
-
         min_score = sorted_scores[-1][1]
         max_score = sorted_scores[0][1]
         score_range = max_score - min_score if max_score != min_score else 1
 
-
         Output = ''
         for name, score in sorted_scores:
-
             ratio = (score - min_score) / score_range
 
-            red = int(255 * ratio)
-            green = int(255 * (1 - ratio))
-            color = f"rgb({red}, {green}, 0)"
+
+            hue = int(120 * ratio)
+            saturation = 100
+            lightness = 50
+            color = f"hsl({hue}, {saturation}%, {lightness}%)"
 
             Output += f'<tr style="background-color: {color}"> <td>{name}</td> <td>{score}</td> </tr>'
-
 
         self.wfile.write(bytes(f"<table> {Output} </table>", 'utf-8'))
 
