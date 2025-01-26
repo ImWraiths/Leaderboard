@@ -40,6 +40,10 @@ class Leaderboard:
         except FileNotFoundError:
             self.score_table = {}
 
+    def clear_leaderboard(self, filename):
+        self.score_table = {}
+        self.save_to_file(filename)
+
 
 the_leaderboard = Leaderboard()
 the_leaderboard.load_from_file("leaderboard.json")
@@ -59,18 +63,36 @@ class Handler(BaseHTTPRequestHandler):
                 the_leaderboard.set_score(name, int(score))
                 the_leaderboard.save_to_file("leaderboard.json")
 
+        if self.path == '/reset-leaderboard':
+            the_leaderboard.clear_leaderboard("leaderboard.json")
+            self.send_response(302)
+            self.send_header('Location', '/')
+            self.end_headers()
+
         if self.path == '/table-fileupload':
-            content_length = int(self.headers['Content-Length'])
-            header = cgi.parse_header(self.headers['Content-Type'])[1]
-            header['boundary'] = header['boundary'].encode('utf-8')
-            post_body = cgi.parse_multipart(self.rfile, header)
-            print(post_body)
+            try:
+                content_length = int(self.headers['Content-Length'])
+                header = cgi.parse_header(self.headers['Content-Type'])[1]
+                header['boundary'] = header['boundary'].encode('utf-8')
+                post_body = cgi.parse_multipart(self.rfile, header)
 
-            scores = json.loads(post_body['filename'][0].decode('utf-8'))
-            print(scores)
+                scores = json.loads(post_body['filename'][0].decode('utf-8'))
 
-            for name, score in scores:
-                the_leaderboard.set_score(name, score)
+                for score_entry in scores:
+                    name = score_entry[0]
+                    score = score_entry[1]
+                    if len(score_entry) > 2:
+                        timestamp = score_entry[2]
+                    else:
+                        timestamp = None
+                    the_leaderboard.set_score(name, score, timestamp)
+
+                the_leaderboard.save_to_file("leaderboard.json")
+                self.send_response(302)
+                self.send_header('Location', '/')
+                self.end_headers()
+            except:
+                pass
 
         self.send_response(302)
         self.send_header('Location', '/')
@@ -92,8 +114,20 @@ class Handler(BaseHTTPRequestHandler):
 
             html = """
             <html>
+            <!-- Latest compiled and minified CSS -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@3.4.1/dist/css/bootstrap.min.css" integrity="sha384-HSMxcRTRxnN+Bdg0JdbxYKrThecOKuH5zCYotlSAcp1+c8xmyTe9GYg1l9a69psu" crossorigin="anonymous">
+
+<!-- Optional theme -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@3.4.1/dist/css/bootstrap-theme.min.css" integrity="sha384-6pzBo3FDv/PJ8r2KRkGHifhEocL+1X2rVCTTkUfGk7/0pbek5mMa1upzvWbrUbOZ" crossorigin="anonymous">
+
+<!-- Latest compiled and minified JavaScript -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@3.4.1/dist/js/bootstrap.min.js" integrity="sha384-aJ21OjlMXNL5UyIl/XNwTMqvzeRMZH2w8c5cRVpzpU8Y5bApTppSuUkhZXN0VxHd" crossorigin="anonymous"></script>
+<style>
+tr th{margin-bottom:1em;}
+tr{padding-left: 1em; background-color: #f2f2f2; vertical-align: middle;}
+</style>
             <head><title>Leaderboard</title></head>
-            <body>
+            <body style="margin:2em">
                 <h1>Submit Your Score</h1>
                 <form method="POST" action="/">
                     <label for="name">Name:</label>
@@ -102,10 +136,13 @@ class Handler(BaseHTTPRequestHandler):
                     <input type="number" id="score" name="score" required><br><br>
                     <input type="submit" value="Submit">
                 </form>
+                <form method="POST" action="/reset-leaderboard" style="margin-top: 1em;"><button type="submit" class="btn btn-danger">Clear Leaderboard</button>
+</form>
 
                 <h2>Leaderboard</h2>
-                <table border="1">
-                    <tr><th>Name</th><th>Score</th><th>Last Edited</th></tr>
+
+                <table border="0">
+                    <tr style="margin-bottom:1ex;"><th >Name</th><th style="padding-right:1ex;">Score</th><th style="padding-right:1ex;">Last Edited</th><th style="padding-left:2em;width:10em">bar</th></tr>
             """
 
             sorted_scores = the_leaderboard.get_sorted_Scores(100, 'descending')
@@ -117,9 +154,9 @@ class Handler(BaseHTTPRequestHandler):
                 for name, score, timestamp in sorted_scores:
                     ratio = (score - min_score) / score_range
                     hue = int(120 * ratio)
-                    color = f"hsl({hue}, 100%, 50%)"
+                    color = f"hsl({hue}, 100%, 80%)"
 
-                    html += f'<tr style="background-color: {color}"><td>{name}</td><td>{score}</td><td>{timestamp}</td></tr>'
+                    html += f'<tr style=""><td>{name}</td><td>{score}</td><td>{timestamp}</td><td style="">      <div class="progress">        <div class="progress-bar" role="progressbar" aria-valuenow="{score}" aria-valuemin="0" aria-valuemax="{max_score}" style="background-color: {color}; width: {score * 100 / max_score}%;"><span class="sr-only">60% Complete</span></div>      </div></td></tr>'
             else:
                 html += "<tr><td colspan='3'>No scores yet.</td></tr>"
 
