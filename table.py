@@ -40,6 +40,16 @@ the_leaderboard.load_from_file("leaderboard.json")
 
 
 class Handler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header('Content-type', 'text/html')
+        self.end_headers()
+        scores = the_leaderboard.get_sorted_Scores(len(the_leaderboard.score_table))
+        html = "<html><body><table border='1'>"
+        for i, (name, score) in enumerate(scores):
+            html += "<tr style='background-color: hsl({}, {}, {})'><td>{}</td><td>{}</td></tr>".format((i * ) % 256, (i * 70) % 256, (i * 100) % 256, name, score)
+        html += "</table></body></html>"
+        self.wfile.write(bytes(html, 'utf-8'))
     def do_POST (self):
         self.send_response(200)
         self.send_header('Content-type', 'text/html')
@@ -50,18 +60,9 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(bytes("POST request for {}".format(self.path)  , 'utf-8'))
         the_leaderboard.set_score(name, int(score))
         the_leaderboard.save_to_file("leaderboard.json")
-    def do_GET(self):
-        def do_GET(self):
-            self.send_response(200)
-            self.send_header('Content-type', 'text/html')
-            self.end_headers()
-            Output = ''
-            for score in the_leaderboard.get_sorted_Scores(10, 'descending'):
-                Output += f"<tr> <td> {score[0]} </td> <td> {score[1]} </td> </tr>"
-            self.wfile.write(bytes(f"<table> {Output} </table>", 'utf-8'))
 
-
-
+the_leaderboard = Leaderboard()
+the_leaderboard.load_from_file("leaderboard.json")
 http_server = HTTPServer(('', 8080), Handler)
 http_server.serve_forever()
 
