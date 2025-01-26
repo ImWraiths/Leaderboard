@@ -1,7 +1,9 @@
 import cgi
+import os
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import json
-import urllib.parse as urlparse  # For parsing POST data
+import urllib.parse as urlparse
+from datetime import datetime
 
 
 class Leaderboard:
@@ -69,6 +71,7 @@ class Handler(BaseHTTPRequestHandler):
 
             for name, score in scores:
                 the_leaderboard.set_score(name, score)
+                the_leaderboard.save_to_file("leaderboard.json")
 
         self.send_response(302)
         self.send_header('Location', '/')
@@ -87,6 +90,12 @@ class Handler(BaseHTTPRequestHandler):
             self.send_response(200)
             self.send_header('Content-type', 'text/html')
             self.end_headers()
+
+            try:
+                last_modefied_timestamp = os.path.getmtime("leaderboard.json")
+                last_modified_date = datetime.fromtimestamp(last_modefied_timestamp).strftime('%Y-%m-%d %H:%M:%S')
+            except FileNotFoundError:
+                last_modified_date = "Unknown"
 
             html = """
             <html>
@@ -120,9 +129,10 @@ class Handler(BaseHTTPRequestHandler):
             else:
                 html += "<tr><td colspan='2'>No scores yet.</td></tr>"
 
-            html += """
+            html += f"""
                 </table>
                 <br>
+                <p>Last modified: {last_modified_date}</p>
                 <a href="/download-sorted-scores"><button type="button">Download Leaderboard</button></a>
                 <form action="/table-fileupload" method="post" enctype="multipart/form-data">
                     <input type="file" id="myFile" name="filename">
