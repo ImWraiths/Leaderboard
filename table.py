@@ -1,5 +1,4 @@
 import cgi
-import os
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import json
 import urllib.parse as urlparse
@@ -7,24 +6,28 @@ from datetime import datetime
 
 
 class Leaderboard:
-    """ hello """
+    """hello"""
     score_table = {}
 
-    def set_score(self, name, score):
-        self.score_table[name] = score
-        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        self.score_table[name] = {"score": score, "timestamp": timestamp}
+    def set_score(self, name, score, timestamp=None, ):
+        if timestamp is None:
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        self.score_table[name] = {'score': score, 'timestamp': current_time}
 
     def get_sorted_Scores(self, count, sort_order='descending'):
-        if sort_order == 'ascending':
-            sorted_table = dict(sorted(self.score_table.items(), key=lambda item: item[1]))
-        elif sort_order == 'descending':
-            sorted_table = dict(sorted(self.score_table.items(), key=lambda item: item[1]["score"], reverse=(sort_order == 'descending')))
+        if sort_order in ['ascending', 'descending']:
+            reverse_order = sort_order == 'descending'
+            sorted_table = sorted(
+                self.score_table.items(),
+                key=lambda item: item[1]['score'],
+                reverse=reverse_order
+            )
+
+            return [(name, data['score'], data['timestamp']) for name, data in sorted_table[:count]]
         else:
             print("Invalid sort order. Use 'ascending' or 'descending'.")
             return []
-
-        return [(name, data["score"], data["timestamp"]) for name, data in sorted_table.items()][:count]
 
     def save_to_file(self, filename):
         with open(filename, 'w') as file:
@@ -44,9 +47,7 @@ the_leaderboard.load_from_file("leaderboard.json")
 
 class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
-
         if self.path == '/':
-
             content_length = int(self.headers['Content-Length'])
             post_data = self.rfile.read(content_length).decode('utf-8')
             parsed_data = urlparse.parse_qs(post_data)
@@ -60,20 +61,16 @@ class Handler(BaseHTTPRequestHandler):
 
         if self.path == '/table-fileupload':
             content_length = int(self.headers['Content-Length'])
-            # post_body = self.rfile.read(content_length).decode('utf-8')
             header = cgi.parse_header(self.headers['Content-Type'])[1]
             header['boundary'] = header['boundary'].encode('utf-8')
             post_body = cgi.parse_multipart(self.rfile, header)
             print(post_body)
-            # print(self.rfile.read())
-            # post_data = self.rfile.read(content_length).decode('utf-8')
 
             scores = json.loads(post_body['filename'][0].decode('utf-8'))
             print(scores)
 
             for name, score in scores:
                 the_leaderboard.set_score(name, score)
-                the_leaderboard.save_to_file("leaderboard.json")
 
         self.send_response(302)
         self.send_header('Location', '/')
@@ -93,12 +90,6 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header('Content-type', 'text/html')
             self.end_headers()
 
-            try:
-                last_modefied_timestamp = os.path.getmtime("leaderboard.json")
-                last_modified_date = datetime.fromtimestamp(last_modefied_timestamp).strftime('%Y-%m-%d %H:%M:%S')
-            except FileNotFoundError:
-                last_modified_date = "Unknown"
-
             html = """
             <html>
             <head><title>Leaderboard</title></head>
@@ -114,7 +105,7 @@ class Handler(BaseHTTPRequestHandler):
 
                 <h2>Leaderboard</h2>
                 <table border="1">
-                    <tr><th>Name</th><th>Score</th><th>Timestamp</th></tr>
+                    <tr><th>Name</th><th>Score</th><th>Last Edited</th></tr>
             """
 
             sorted_scores = the_leaderboard.get_sorted_Scores(100, 'descending')
@@ -127,14 +118,14 @@ class Handler(BaseHTTPRequestHandler):
                     ratio = (score - min_score) / score_range
                     hue = int(120 * ratio)
                     color = f"hsl({hue}, 100%, 50%)"
+
                     html += f'<tr style="background-color: {color}"><td>{name}</td><td>{score}</td><td>{timestamp}</td></tr>'
             else:
-                html += "<tr><td colspan='2'>No scores yet.</td></tr>"
+                html += "<tr><td colspan='3'>No scores yet.</td></tr>"
 
-            html += f"""
+            html += """
                 </table>
                 <br>
-                <p>Last modified: {last_modified_date}</p>
                 <a href="/download-sorted-scores"><button type="button">Download Leaderboard</button></a>
                 <form action="/table-fileupload" method="post" enctype="multipart/form-data">
                     <input type="file" id="myFile" name="filename">
