@@ -12,17 +12,19 @@ class Leaderboard:
 
     def set_score(self, name, score):
         self.score_table[name] = score
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        self.score_table[name] = {"score": score, "timestamp": timestamp}
 
     def get_sorted_Scores(self, count, sort_order='descending'):
         if sort_order == 'ascending':
             sorted_table = dict(sorted(self.score_table.items(), key=lambda item: item[1]))
         elif sort_order == 'descending':
-            sorted_table = dict(sorted(self.score_table.items(), key=lambda item: item[1], reverse=True))
+            sorted_table = dict(sorted(self.score_table.items(), key=lambda item: item[1]["score"], reverse=(sort_order == 'descending')))
         else:
             print("Invalid sort order. Use 'ascending' or 'descending'.")
             return []
 
-        return list(sorted_table.items())[:count]
+        return [(name, data["score"], data["timestamp"]) for name, data in sorted_table.items()][:count]
 
     def save_to_file(self, filename):
         with open(filename, 'w') as file:
@@ -112,7 +114,7 @@ class Handler(BaseHTTPRequestHandler):
 
                 <h2>Leaderboard</h2>
                 <table border="1">
-                    <tr><th>Name</th><th>Score</th></tr>
+                    <tr><th>Name</th><th>Score</th><th>Timestamp</th></tr>
             """
 
             sorted_scores = the_leaderboard.get_sorted_Scores(100, 'descending')
@@ -121,11 +123,11 @@ class Handler(BaseHTTPRequestHandler):
                 max_score = sorted_scores[0][1]
                 score_range = max_score - min_score if max_score != min_score else 1
 
-                for name, score in sorted_scores:
+                for name, score, timestamp in sorted_scores:
                     ratio = (score - min_score) / score_range
                     hue = int(120 * ratio)
                     color = f"hsl({hue}, 100%, 50%)"
-                    html += f'<tr style="background-color: {color}"><td>{name}</td><td>{score}</td></tr>'
+                    html += f'<tr style="background-color: {color}"><td>{name}</td><td>{score}</td><td>{timestamp}</td></tr>'
             else:
                 html += "<tr><td colspan='2'>No scores yet.</td></tr>"
 
