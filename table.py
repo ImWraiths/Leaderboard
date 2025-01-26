@@ -40,16 +40,6 @@ the_leaderboard.load_from_file("leaderboard.json")
 
 
 class Handler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.send_header('Content-type', 'text/html')
-        self.end_headers()
-        scores = the_leaderboard.get_sorted_Scores(len(the_leaderboard.score_table))
-        html = "<html><body><table border='1'>"
-        for i, (name, score) in enumerate(scores):
-            html += "<tr style='background-color: hsl({}, {}, {})'><td>{}</td><td>{}</td></tr>".format((i * ) % 256, (i * 70) % 256, (i * 100) % 256, name, score)
-        html += "</table></body></html>"
-        self.wfile.write(bytes(html, 'utf-8'))
     def do_POST (self):
         self.send_response(200)
         self.send_header('Content-type', 'text/html')
@@ -61,8 +51,38 @@ class Handler(BaseHTTPRequestHandler):
         the_leaderboard.set_score(name, int(score))
         the_leaderboard.save_to_file("leaderboard.json")
 
-the_leaderboard = Leaderboard()
-the_leaderboard.load_from_file("leaderboard.json")
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header('Content-type', 'text/html')
+        self.end_headers()
+
+
+        sorted_scores = the_leaderboard.get_sorted_Scores(10, 'descending')
+        if not sorted_scores:  # Exit if there are no scores
+            self.wfile.write(bytes("<p>No scores to display.</p>", 'utf-8'))
+            return
+
+
+        min_score = sorted_scores[-1][1]
+        max_score = sorted_scores[0][1]
+        score_range = max_score - min_score if max_score != min_score else 1
+
+
+        Output = ''
+        for name, score in sorted_scores:
+
+            ratio = (score - min_score) / score_range
+
+            red = int(255 * ratio)
+            green = int(255 * (1 - ratio))
+            color = f"rgb({red}, {green}, 0)"
+
+            Output += f'<tr style="background-color: {color}"> <td>{name}</td> <td>{score}</td> </tr>'
+
+
+        self.wfile.write(bytes(f"<table> {Output} </table>", 'utf-8'))
+
+
 http_server = HTTPServer(('', 8080), Handler)
 http_server.serve_forever()
 
